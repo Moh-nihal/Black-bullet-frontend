@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import AdminSidebar from "@/components/AdminSidebar";
+import AdminUserBadge from "@/components/AdminUserBadge";
 import ContentTabs from "@/components/cms/ContentTabs";
 import HomePageEditor from "@/components/cms/HomePageEditor";
 import ServicesPageEditor from "@/components/cms/LandingPageEditor";
@@ -232,9 +233,9 @@ export default function ContentManagementPage() {
   return (
     <>
       <AdminSidebar />
-      <main className="flex-1 overflow-y-auto bg-surface min-h-screen relative">
+      <main className="flex-1 w-full overflow-x-hidden overflow-y-auto bg-surface min-h-screen relative">
         {/* Topbar */}
-        <header className="flex justify-between items-center w-full px-8 py-4 sticky top-0 z-50 bg-background/60 backdrop-blur-xl border-b border-white/10">
+        <header className="flex justify-between items-center w-full px-4 pl-14 md:px-8 py-4 sticky top-0 z-50 bg-background/60 backdrop-blur-xl border-b border-white/10">
           <div className="flex items-center gap-8">
             <h1 className="text-xl font-black tracking-widest text-white uppercase font-headline">
               Website Content
@@ -251,13 +252,7 @@ export default function ContentManagementPage() {
               <span className="material-symbols-outlined">notifications</span>
             </button>
             <div className="flex items-center gap-3 pl-6 border-l border-white/10">
-              <div className="text-right">
-                <p className="text-xs font-headline font-bold text-white uppercase tracking-wider">Admin User</p>
-                <p className="text-[10px] text-on-surface-variant">Content Manager</p>
-              </div>
-              <div className="w-10 h-10 bg-surface-container-highest flex items-center justify-center border border-primary/20">
-                <span className="material-symbols-outlined text-primary">person</span>
-              </div>
+              <AdminUserBadge />
             </div>
           </div>
         </header>

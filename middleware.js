@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server';
 
 export function middleware(request) {
-  // Check if accessing admin routes (except login)
   if (request.nextUrl.pathname.startsWith('/admin') && !request.nextUrl.pathname.startsWith('/admin/login')) {
     const token = request.cookies.get('admin_token');
     
-    // Validate token exists
-    if (!token || token.value !== 'authenticated') {
+    // Validate token exists (actual validation is done by the backend API)
+    if (!token) {
       // Redirect unauthenticated users to the login page
       return NextResponse.redirect(new URL('/admin/login', request.url));
     }

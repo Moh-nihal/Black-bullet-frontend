@@ -1,9 +1,80 @@
 "use client";
 
+import { useState } from "react";
 import ImageUploader from "@/components/ImageUploader";
+import api from "@/lib/api";
+import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
 
 export default function ServiceForm({ initialData = {} }) {
-  const isEdit = !!initialData.title;
+  const router = useRouter();
+  const isEdit = !!initialData._id;
+
+  const [formData, setFormData] = useState({
+    title: initialData.title || "",
+    price: initialData.price || "",
+    category: initialData.category || "performance",
+    description: initialData.description || "",
+    metaTitle: initialData.metaTitle || "",
+    metaKeywords: initialData.metaKeywords?.join(", ") || "",
+    status: initialData.status || "draft",
+    images: initialData.images || [],
+    previousImages: initialData.images || [],
+    removedImagePublicIds: [],
+  });
+
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleImageUpload = (url) => {
+    setFormData((prev) => ({ ...prev, images: [...prev.images, url] }));
+  };
+
+  const removeImage = (indexToRemove) => {
+    setFormData((prev) => {
+      const imgToRemove = prev.images[indexToRemove];
+      // Note: In a real app we'd extract the public ID to pass into removedImagePublicIds 
+      // but the backend uses `collectPublicIdsForCleanup` with previousImages for diffing if partial
+      // We will just keep it simple and let the backend diff if needed, or pass empty.
+      return {
+        ...prev,
+        images: prev.images.filter((_, i) => i !== indexToRemove),
+      };
+    });
+  };
+
+  const handleSave = async (status = "active") => {
+    if (!formData.title) {
+      return toast.error("Service title is required");
+    }
+    
+    setIsSaving(true);
+    try {
+      const payload = {
+        ...formData,
+        status: status.toLowerCase(),
+        metaKeywords: formData.metaKeywords.split(",").map(k => k.trim()).filter(Boolean),
+        slug: formData.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")
+      };
+
+      if (isEdit) {
+        await api.put(`/admin/services/${initialData._id}`, payload);
+        toast.success("Service updated successfully");
+      } else {
+        await api.post("/admin/services", payload);
+        toast.success("Service created successfully");
+      }
+      router.push("/admin/services");
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message || "Failed to save service");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <div className="grid grid-cols-12 gap-8 md:gap-10">
@@ -23,10 +94,12 @@ export default function ServiceForm({ initialData = {} }) {
                 Service Title
               </label>
               <input
+                name="title"
                 className="w-full bg-surface-container-highest border-none p-4 text-white focus:ring-0 placeholder:text-outline transition-all focus:bg-surface-bright border-b-2 border-transparent focus:border-primary"
                 placeholder="e.g. Stage 2 Performance Remap"
                 type="text"
-                defaultValue={initialData.title || ""}
+                value={formData.title}
+                onChange={handleChange}
               />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -36,10 +109,12 @@ export default function ServiceForm({ initialData = {} }) {
                 </label>
                 <div className="relative">
                   <input
+                    name="price"
                     className="w-full bg-surface-container-highest border-none p-4 text-white focus:ring-0 placeholder:text-outline focus:bg-surface-bright border-b-2 border-transparent focus:border-primary"
                     placeholder="2,500"
                     type="number"
-                    defaultValue={initialData.price || ""}
+                    value={formData.price}
+                    onChange={handleChange}
                   />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant text-xs font-label">
                     AED
@@ -51,8 +126,10 @@ export default function ServiceForm({ initialData = {} }) {
                   Category
                 </label>
                 <select
+                  name="category"
                   className="w-full bg-surface-container-highest border-none p-4 text-white focus:ring-0 focus:bg-surface-bright border-b-2 border-transparent focus:border-primary appearance-none cursor-pointer"
-                  defaultValue={initialData.category || "performance"}
+                  value={formData.category}
+                  onChange={handleChange}
                 >
                   <option value="performance">Performance Tuning</option>
                   <option value="aesthetics">Aesthetics &amp; Body</option>
@@ -66,10 +143,12 @@ export default function ServiceForm({ initialData = {} }) {
                 Service Description
               </label>
               <textarea
+                name="description"
                 className="w-full bg-surface-container-highest border-none p-4 text-white focus:ring-0 placeholder:text-outline focus:bg-surface-bright border-b-2 border-transparent focus:border-primary resize-none"
                 placeholder="Describe the precision and performance gains..."
                 rows={6}
-                defaultValue={initialData.description || ""}
+                value={formData.description}
+                onChange={handleChange}
               />
             </div>
           </div>
@@ -89,9 +168,12 @@ export default function ServiceForm({ initialData = {} }) {
                 Meta Title
               </label>
               <input
+                name="metaTitle"
                 className="w-full bg-surface-container-highest border-none p-4 text-white focus:ring-0 placeholder:text-outline focus:bg-surface-bright border-b-2 border-transparent focus:border-primary"
                 placeholder="Service SEO Title"
                 type="text"
+                value={formData.metaTitle}
+                onChange={handleChange}
               />
             </div>
             <div className="group">
@@ -99,9 +181,12 @@ export default function ServiceForm({ initialData = {} }) {
                 Meta Keywords
               </label>
               <input
+                name="metaKeywords"
                 className="w-full bg-surface-container-highest border-none p-4 text-white focus:ring-0 placeholder:text-outline focus:bg-surface-bright border-b-2 border-transparent focus:border-primary"
                 placeholder="Dubai, tuning, performance, garage..."
                 type="text"
+                value={formData.metaKeywords}
+                onChange={handleChange}
               />
             </div>
           </div>
@@ -121,18 +206,31 @@ export default function ServiceForm({ initialData = {} }) {
           <ImageUploader
             aspectClass="aspect-square"
             hint="PNG, JPG up to 10MB"
+            onUploadSuccess={handleImageUpload}
           />
-          <div className="mt-6 grid grid-cols-3 gap-3">
-            {[1, 2, 3].map((i) => (
+          <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {formData.images.map((img, i) => (
               <div
                 key={i}
-                className="aspect-square bg-surface-container-highest border border-outline-variant/20 flex items-center justify-center"
+                className="relative aspect-square bg-surface-container-highest border border-outline-variant/20 flex items-center justify-center group"
               >
-                <span className="material-symbols-outlined text-outline-variant text-sm">
-                  add
-                </span>
+                <img src={img} alt="Service" className="w-full h-full object-cover" />
+                <button
+                  type="button"
+                  onClick={() => removeImage(i)}
+                  className="absolute top-1 right-1 bg-black/60 p-1 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <span className="material-symbols-outlined text-sm">close</span>
+                </button>
               </div>
             ))}
+            {formData.images.length < 5 && (
+              <div className="aspect-square bg-surface-container-highest border border-outline-variant/20 flex items-center justify-center opacity-50">
+                <span className="material-symbols-outlined text-outline-variant text-sm">
+                  image
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -160,10 +258,16 @@ export default function ServiceForm({ initialData = {} }) {
             </div>
           </div>
           <div className="mt-8 md:mt-10 flex flex-col gap-3">
-            <button className="w-full bg-gradient-to-br from-primary to-primary-dim text-on-primary-fixed font-label text-xs tracking-[0.2em] uppercase font-black py-4 md:py-5 transition-all active:scale-95 shadow-[0_10px_20px_rgba(255,143,115,0.15)]">
-              {isEdit ? "Update Service" : "Publish Service"}
+            <button 
+              onClick={() => handleSave("active")}
+              disabled={isSaving}
+              className="w-full bg-gradient-to-br from-primary to-primary-dim text-on-primary-fixed font-label text-xs tracking-[0.2em] uppercase font-black py-4 md:py-5 transition-all active:scale-95 shadow-[0_10px_20px_rgba(255,143,115,0.15)] disabled:opacity-50 disabled:cursor-not-allowed">
+              {isSaving ? "Saving..." : isEdit ? "Update Service" : "Publish Service"}
             </button>
-            <button className="w-full bg-secondary-container text-on-surface font-label text-xs tracking-[0.2em] uppercase font-bold py-4 md:py-5 hover:bg-surface-bright transition-all border border-outline-variant/20">
+            <button 
+              onClick={() => handleSave("draft")}
+              disabled={isSaving}
+              className="w-full bg-secondary-container text-on-surface font-label text-xs tracking-[0.2em] uppercase font-bold py-4 md:py-5 hover:bg-surface-bright transition-all border border-outline-variant/20 disabled:opacity-50 disabled:cursor-not-allowed">
               Save Draft
             </button>
           </div>

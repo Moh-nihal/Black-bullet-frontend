@@ -4,10 +4,13 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
+import api from "@/lib/api";
+import toast from "react-hot-toast";
 
 export default function AdminLoginPage() {
-  const [email, setEmail] = useState("admin@blackbullet.com");
-  const [password, setPassword] = useState("password123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -17,18 +20,18 @@ export default function AdminLoginPage() {
     setLoading(true);
     setError("");
 
-    // Simulate network delay
-    await new Promise((resolve) => setTimeout(resolve, 800));
-
-    if (
-      (email === "admin@blackbullet.com" || email === "admin") &&
-      password === "password123"
-    ) {
-      // Set a simple cookie for middleware to read
-      document.cookie = "admin_token=authenticated; path=/; max-age=86400"; // 1 day
-      router.push("/admin");
-    } else {
-      setError("AUTHENTICATION_ERROR: INVALID_CREDENTIALS");
+    try {
+      const response = await api.post("/admin/login", { email, password });
+      
+      if (response.data.success) {
+        toast.success("Login successful");
+        router.push("/admin");
+      }
+    } catch (err) {
+      setError(
+        err.response?.data?.message || err.message || "AUTHENTICATION_ERROR: INVALID_CREDENTIALS"
+      );
+    } finally {
       setLoading(false);
     }
   };
@@ -104,7 +107,7 @@ export default function AdminLoginPage() {
               <div className="relative group">
                 <input
                   id="password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   placeholder="••••••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -114,11 +117,12 @@ export default function AdminLoginPage() {
                 />
                 <button
                   type="button"
+                  onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors disabled:opacity-50"
                   disabled={loading}
                 >
                   <span className="material-symbols-outlined text-xl">
-                    visibility
+                    {showPassword ? "visibility_off" : "visibility"}
                   </span>
                 </button>
               </div>

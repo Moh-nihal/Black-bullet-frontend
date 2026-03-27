@@ -1,28 +1,76 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import api from "@/lib/api";
+import toast from "react-hot-toast";
 
 const navItems = [
   { icon: "dashboard", label: "Dashboard", href: "/admin" },
   { icon: "calendar_today", label: "Bookings", href: "/admin/bookings" },
   { icon: "build", label: "Services", href: "/admin/services" },
+  { icon: "collections", label: "Gallery", href: "/admin/gallery" },
   { icon: "article", label: "Blog", href: "/admin/blog" },
   { icon: "edit_note", label: "Website Content", href: "/admin/content" },
-  { icon: "settings", label: "Settings", href: "/admin" },
 ];
 
 export default function AdminSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const [isOpen, setIsOpen] = useState(false);
+
+  // Close sidebar on route change
+  useEffect(() => {
+    setIsOpen(false);
+  }, [pathname]);
 
   const isActive = (href) => {
     if (href === "/admin") return pathname === "/admin";
     return pathname.startsWith(href);
   };
 
+  const handleLogout = async () => {
+    try {
+      await api.post("/admin/logout");
+      toast.success("Logged out successfully");
+      router.push("/admin/login");
+    } catch (err) {
+      toast.error("Error logging out");
+      // Still push them to login as fallback
+      router.push("/admin/login");
+    }
+  };
+
   return (
-    <aside className="h-screen w-64 border-r border-white/5 bg-[#131313] flex flex-col shrink-0">
-      {/* Branding */}
+    <>
+      {/* Mobile Hamburger Button */}
+      <button 
+        onClick={() => setIsOpen(true)}
+        className="md:hidden fixed top-3 left-4 z-[60] p-1.5 bg-surface-container rounded-sm border border-white/10 flex items-center justify-center hover:bg-white/5 transition-colors"
+      >
+        <span className="material-symbols-outlined text-white text-xl">menu</span>
+      </button>
+
+      {/* Mobile Backdrop */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/80 z-[60] md:hidden backdrop-blur-sm"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+
+      {/* Sidebar Content */}
+      <aside className={`fixed md:relative top-0 left-0 h-screen w-64 border-r border-white/5 bg-[#131313] flex flex-col shrink-0 z-[70] transition-transform duration-300 ${isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}>
+        {/* Mobile Close Button */}
+        <button 
+          onClick={() => setIsOpen(false)}
+          className="md:hidden absolute top-4 right-4 text-on-surface-variant hover:text-white transition-colors"
+        >
+          <span className="material-symbols-outlined">close</span>
+        </button>
+
+        {/* Branding */}
       <div className="px-6 py-8">
         <div className="flex items-center gap-3 mb-2">
           <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary-dim flex items-center justify-center">
@@ -78,10 +126,7 @@ export default function AdminSidebar() {
           New Booking
         </Link>
         <button
-          onClick={() => {
-            document.cookie = "admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
-            window.location.href = "/admin/login";
-          }}
+          onClick={handleLogout}
           className="w-full bg-surface-container border border-outline-variant/20 hover:border-primary hover:text-primary text-on-surface-variant transition-colors font-label font-bold py-3 text-xs uppercase tracking-widest flex items-center justify-center gap-2"
         >
           <span className="material-symbols-outlined text-sm">logout</span>
@@ -89,5 +134,6 @@ export default function AdminSidebar() {
         </button>
       </div>
     </aside>
+    </>
   );
 }
