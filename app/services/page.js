@@ -7,54 +7,49 @@ export const metadata = {
     "ECU programming, advanced diagnostics, mechanical repair, electrical systems, performance tuning, and custom exhaust solutions in Dubai.",
 };
 
-const services = [
-  {
-    num: "01",
-    title: "ECU Programming",
-    img: "/images/service-ecu.jpg",
-    alt: "High-tech engine control unit with wiring",
-    desc: "Bespoke engine remapping for ultimate power and efficiency.",
-    active: true,
-    slug: "ecu-programming",
-  },
-  {
-    num: "02",
-    title: "Advanced Diagnostics",
-    img: "/images/service-diag.jpg",
-    alt: "Digital diagnostic tool plugged into car",
-    slug: "ecu-programming",
-  },
-  {
-    num: "03",
-    title: "Mechanical Repair",
-    img: "/images/service-mech.jpg",
-    alt: "Mechanic working on high performance engine",
-    slug: "mechanical-electrical",
-  },
-  {
-    num: "04",
-    title: "Electrical Systems",
-    img: "/images/service-elec.jpg",
-    alt: "Complex electrical wiring and circuit boards",
-    slug: "mechanical-electrical",
-  },
-  {
-    num: "05",
-    title: "Performance Tuning",
-    img: "/images/service-perf.jpg",
-    alt: "Racing car on a dynamometer",
-    slug: "ecu-programming",
-  },
-  {
-    num: "06",
-    title: "Custom Exhaust",
-    img: "/images/service-exhaust.jpg",
-    alt: "Titanium exhaust pipe with blue heat tint",
-    slug: "mechanical-electrical",
-  },
+// Fallback data
+const fallbackServices = [
+  { num: "01", title: "ECU Programming", img: "/images/service-ecu.jpg", alt: "High-tech engine control unit with wiring", desc: "Bespoke engine remapping for ultimate power and efficiency.", active: true, slug: "ecu-programming" },
+  { num: "02", title: "Advanced Diagnostics", img: "/images/service-diag.jpg", alt: "Digital diagnostic tool plugged into car", slug: "ecu-programming" },
+  { num: "03", title: "Mechanical Repair", img: "/images/service-mech.jpg", alt: "Mechanic working on high performance engine", slug: "mechanical-electrical" },
+  { num: "04", title: "Electrical Systems", img: "/images/service-elec.jpg", alt: "Complex electrical wiring and circuit boards", slug: "mechanical-electrical" },
+  { num: "05", title: "Performance Tuning", img: "/images/service-perf.jpg", alt: "Racing car on a dynamometer", slug: "ecu-programming" },
+  { num: "06", title: "Custom Exhaust", img: "/images/service-exhaust.jpg", alt: "Titanium exhaust pipe with blue heat tint", slug: "mechanical-electrical" },
 ];
 
-export default function ServicesPage() {
+async function getServices() {
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001"}/api/public/services?limit=50`, {
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error("Failed to fetch services");
+    const data = await res.json();
+    return data?.data || [];
+  } catch {
+    return [];
+  }
+}
+
+export default async function ServicesPage() {
+  const apiServices = await getServices();
+
+  // Map API services to display format, or use fallback
+  const services = apiServices.length > 0
+    ? apiServices.map((s, i) => ({
+        num: String(i + 1).padStart(2, "0"),
+        title: s.title,
+        img: s.images?.[0] || `/images/service-ecu.jpg`,
+        alt: s.title,
+        desc: s.shortDesc || s.description || "",
+        active: i === 0,
+        slug: s.slug || s._id,
+        isRemote: !!(s.images?.[0]),
+      }))
+    : fallbackServices;
+
+  // Take first active service for the ECU Detail section
+  const detailService = apiServices.length > 0 ? apiServices[0] : null;
+
   return (
     <>
       {/* Hero */}
@@ -91,6 +86,7 @@ export default function ServicesPage() {
                 fill
                 className="object-cover transition-transform duration-700 group-hover:scale-110 opacity-60"
                 sizes="(max-width: 768px) 100vw, 33vw"
+                unoptimized={!!s.isRemote}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-surface-container-lowest via-surface-container-lowest/50 to-transparent" />
               <div className="absolute bottom-0 left-0 p-6 md:p-8 w-full z-10">
@@ -123,15 +119,12 @@ export default function ServicesPage() {
               </span>
             </div>
             <h2 className="font-headline text-[clamp(28px,4vw,48px)] font-black uppercase mb-8 leading-tight">
-              ECU Programming <br />
+              {detailService?.title || "ECU Programming"} <br />
               &amp; <span className="text-primary">Diagnostics</span>
             </h2>
             <div className="space-y-6 text-on-surface-variant text-[clamp(14px,1.2vw,18px)] leading-relaxed">
               <p>
-                Our ECU programming service is not a simple &quot;off-the-shelf&quot;
-                flash. We provide custom calibration designed specifically for
-                your vehicle&apos;s hardware configuration, fuel grade, and desired
-                performance characteristics.
+                {detailService?.description || "Our ECU programming service is not a simple \"off-the-shelf\" flash. We provide custom calibration designed specifically for your vehicle's hardware configuration, fuel grade, and desired performance characteristics."}
               </p>
               <p>
                 Leveraging state-of-the-art diagnostic equipment, we interface
@@ -174,11 +167,12 @@ export default function ServicesPage() {
           <div className="lg:col-span-5 flex flex-col gap-6">
             <div className="relative aspect-square bg-surface-container-highest">
               <Image
-                src="/images/ecu-laptop.jpg"
+                src={detailService?.images?.[0] || "/images/ecu-laptop.jpg"}
                 alt="Laptop displaying 3D fuel map tuning software"
                 fill
                 className="object-cover"
                 sizes="(max-width: 1024px) 100vw, 40vw"
+                unoptimized={!!(detailService?.images?.[0])}
               />
               <div className="absolute top-4 left-4 glass-overlay px-4 py-2 flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />

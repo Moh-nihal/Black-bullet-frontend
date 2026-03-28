@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import api from "@/lib/api";
+import toast from "react-hot-toast";
 import AdminSidebar from "@/components/AdminSidebar";
 import AdminUserBadge from "@/components/AdminUserBadge";
 import ContentTabs from "@/components/cms/ContentTabs";
@@ -197,6 +199,7 @@ const initialSettingsData = {
 export default function ContentManagementPage() {
   const [activeTab, setActiveTab] = useState("home");
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
 
   const [homeData, setHomeData] = useState(initialHomeData);
@@ -205,12 +208,47 @@ export default function ContentManagementPage() {
   const [blogData, setBlogData] = useState(initialBlogData);
   const [settingsData, setSettingsData] = useState(initialSettingsData);
 
-  const handleSave = () => {
+  // Map tabs to pageKeys and state
+  const tabConfig = {
+    home: { pageKey: "home", data: homeData, setData: setHomeData, fallback: initialHomeData },
+    services: { pageKey: "services", data: servicesData, setData: setServicesData, fallback: initialServicesData },
+    gallery: { pageKey: "gallery", data: galleryData, setData: setGalleryData, fallback: initialGalleryData },
+    blog: { pageKey: "blog", data: blogData, setData: setBlogData, fallback: initialBlogData },
+    settings: { pageKey: "settings", data: settingsData, setData: setSettingsData, fallback: initialSettingsData },
+  };
+
+  // Load content from backend when tab changes
+  const loadContent = useCallback(async (pageKey) => {
+    setLoading(true);
+    try {
+      const res = await api.get(`/admin/content/${pageKey}`);
+      const apiData = res.data?.data;
+      if (apiData && Object.keys(apiData).length > 0) {
+        tabConfig[pageKey]?.setData(apiData);
+      }
+    } catch {
+      // Keep fallback mock data on error — no toast needed, user sees mock data
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadContent(activeTab);
+  }, [activeTab, loadContent]);
+
+  const handleSave = async () => {
     setSaving(true);
-    setTimeout(() => {
-      setSaving(false);
+    try {
+      const config = tabConfig[activeTab];
+      await api.put(`/admin/content/${config.pageKey}`, { data: config.data });
       setLastSaved(new Date().toLocaleTimeString());
-    }, 1500);
+      toast.success("Content saved successfully");
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message || "Failed to save content");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const renderEditor = () => {

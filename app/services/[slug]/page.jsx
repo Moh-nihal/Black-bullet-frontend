@@ -1,43 +1,96 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import services, { getServiceBySlug, getAllSlugs } from "@/data/services";
+import { getServiceBySlug } from "@/data/services";
 import ServiceDetailHero from "@/components/ServiceDetailHero";
 import ServiceProcess from "@/components/ServiceProcess";
 import RelatedServices from "@/components/RelatedServices";
 
-export function generateStaticParams() {
-  return getAllSlugs();
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001";
+
+async function getApiService(slug) {
+  try {
+    const res = await fetch(`${API_URL}/api/public/services/${encodeURIComponent(slug)}`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json?.data || null;
+  } catch (error) {
+    return null;
+  }
 }
 
 export async function generateMetadata({ params }) {
   const { slug } = await params;
-  const service = getServiceBySlug(slug);
-  if (!service) return {};
+  const apiService = await getApiService(slug);
+  const localService = getServiceBySlug(slug);
+  
+  const title = apiService?.title || localService?.title;
+  const description = apiService?.shortDesc || apiService?.description || localService?.heroDescription;
+
+  if (!title) return {};
+
   return {
-    title: `${service.title} | BLACK BULLET GARAGE`,
-    description: service.heroDescription,
+    title: `${title} | BLACK BULLET GARAGE`,
+    description: description,
   };
 }
 
 export default async function ServiceDetailPage({ params }) {
   const { slug } = await params;
-  const service = getServiceBySlug(slug);
-  if (!service) notFound();
+  
+  // Try to fetch from API first, then look for local mock data as fallback
+  const apiService = await getApiService(slug);
+  const localService = getServiceBySlug(slug);
+
+  if (!apiService && !localService) {
+    notFound();
+  }
+
+  // Map API data into the rich shape expected by the frontend UI components
+  const service = apiService ? {
+    title: apiService.title || localService?.title || "Service",
+    heroHeadline: apiService.title?.split(" ")[0] || "Service",
+    heroAccent: apiService.title?.split(" ").slice(1).join(" ") || "Details",
+    heroTag: "Excellence",
+    heroImage: apiService.images?.[0] || localService?.heroImage || "/images/svc-mechanical-hero.jpg",
+    heroDescription: apiService.shortDesc || apiService.description || localService?.heroDescription || "",
+    descriptionTitle: apiService.title || localService?.descriptionTitle,
+    descriptionParagraphs: apiService.description ? [apiService.description] : localService?.descriptionParagraphs || [],
+    descriptionImage: apiService.images?.[1] || apiService.images?.[0] || localService?.descriptionImage || "/images/svc-mechanical-diag.jpg",
+    descriptionImageAlt: apiService.title || "Service image",
+    stats: apiService.features && apiService.features.length > 0 
+      ? apiService.features.slice(0, 2).map(f => ({ label: "Feature", value: f })) 
+      : localService?.stats || [{ value: "100%", label: "Precision" }, { value: "Quality", label: "Guarantee" }],
+    processTitle: "The Process",
+    processSteps: apiService.faqs && apiService.faqs.length > 0 
+      ? apiService.faqs.map((f, i) => ({ num: `0${i+1}`, title: f.question, desc: f.answer, icon: "build" })) 
+      : localService?.processSteps || [
+          { num: "01", title: "Diagnostic", desc: "Initial assessment.", icon: "troubleshoot" },
+          { num: "02", title: "Analysis", desc: "Data-driven strategy.", icon: "analytics" },
+          { num: "03", title: "Execution", desc: "Precision implementation.", icon: "build" },
+          { num: "04", title: "Quality Check", desc: "Validation process.", icon: "verified" },
+        ],
+    relatedServices: localService?.relatedServices || [],
+    ctaTitle: "Ready for the",
+    ctaAccent: "Next Level?",
+    ctaDescription: "Book your technical consultation at our Dubai Performance Center.",
+    ctaButton: "Schedule Now",
+    isRemote: !!(apiService.images && apiService.images.length > 0)
+  } : localService;
 
   return (
     <>
-      {/* Hero */}
       <ServiceDetailHero service={service} />
 
-      {/* Description + Stats */}
       <section className="py-20 md:py-32 px-6 md:px-12 bg-surface">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-20 items-center">
           <div className="space-y-8">
             <h2 className="font-headline font-bold text-3xl md:text-4xl text-white uppercase tracking-tight">
               {service.descriptionTitle}
             </h2>
-            <div className="space-y-4 text-on-surface-variant font-body leading-loose">
+            <div className="space-y-4 text-on-surface-variant font-body leading-loose whitespace-pre-line">
               {service.descriptionParagraphs.map((p, i) => (
                 <p key={i}>{p}</p>
               ))}
@@ -59,25 +112,27 @@ export default async function ServiceDetailPage({ params }) {
             <div className="absolute -inset-4 bg-primary/5 blur-2xl group-hover:bg-primary/10 transition-all duration-500" />
             <Image
               src={service.descriptionImage}
-              alt={service.descriptionImageAlt}
+              alt={service.descriptionImageAlt || "Service Description Image"}
               width={800}
               height={600}
-              className="relative z-10 w-full grayscale contrast-125 border border-outline-variant/10"
+              className="relative z-10 w-full grayscale contrast-125 border border-outline-variant/10 object-cover"
+              unoptimized={service.isRemote}
             />
           </div>
         </div>
       </section>
 
-      {/* Process */}
-      <ServiceProcess
-        title={service.processTitle}
-        steps={service.processSteps}
-      />
+      {service.processSteps && service.processSteps.length > 0 && (
+        <ServiceProcess
+          title={service.processTitle}
+          steps={service.processSteps}
+        />
+      )}
 
-      {/* Related Services */}
-      <RelatedServices services={service.relatedServices} />
+      {service.relatedServices && service.relatedServices.length > 0 && (
+        <RelatedServices services={service.relatedServices} />
+      )}
 
-      {/* CTA */}
       <section className="py-16 md:py-24 px-6 md:px-12 relative overflow-hidden bg-surface-container-lowest">
         <div className="absolute top-0 right-0 w-1/2 h-full bg-primary/5 skew-x-12 translate-x-20" />
         <div className="max-w-7xl mx-auto relative z-10 flex flex-col md:flex-row items-center justify-between gap-8 md:gap-12">

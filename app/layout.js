@@ -1,5 +1,6 @@
 import "./globals.css";
 import PublicShell from "@/components/PublicShell";
+import { Toaster } from "react-hot-toast";
 export const metadata = {
   title: "Black Bullet Garage Performance | Dubai",
   description:
@@ -34,6 +35,7 @@ export default function RootLayout({ children }) {
       <body
         className="font-manrope font-body bg-background text-on-surface min-h-screen antialiased"
       >
+        <Toaster position="top-right" />
         <PublicShell>{children}</PublicShell>
       </body>
     </html>
