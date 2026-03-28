@@ -62,36 +62,35 @@ function PillarsSection({ data }) {
   );
 }
 
-function MapSection() {
+function MapSection({ data }) {
   return (
     <section className="h-[350px] md:h-[500px] w-full relative grayscale overflow-hidden group">
       <div className="absolute inset-0 z-0">
         <Image
-          src="/images/map-dubai.jpg"
+          src={data?.backgroundImage || "/images/map-dubai.jpg"}
           alt="Stylized map of Dubai with Black Bullet Garage location"
           fill
           className="object-cover"
           sizes="100vw"
+          unoptimized={!!data?.backgroundImage}
         />
         <div className="absolute inset-0 bg-background/40" />
       </div>
       <div className="absolute inset-0 flex items-center justify-center z-10 w-full max-w-[1200px] mx-auto px-4 lg:px-6">
         <div className="glass-panel p-8 md:p-12 text-center max-w-lg border border-white/10 mx-auto w-full">
           <h3 className="font-headline font-black text-[clamp(24px,2.5vw,36px)] mb-4 uppercase tracking-tighter">
-            Visit the Forge
+            {data?.title || "Visit the Forge"}
           </h3>
-          <p className="font-body text-on-surface-variant mb-6 md:mb-8 text-[clamp(14px,1.2vw,18px)]">
-            Al Quoz Industrial Area 3, Dubai, UAE.
-            <br />
-            Mon - Sat: 09:00 - 20:00
+          <p className="font-body text-on-surface-variant mb-6 md:mb-8 text-[clamp(14px,1.2vw,18px)] whitespace-pre-line">
+            {data?.addressText || "Al Quoz Industrial Area 3, Dubai, UAE.\nMon - Sat: 09:00 - 20:00"}
           </p>
           <Link
-            href="https://maps.google.com"
+            href={data?.mapsLink || "https://maps.google.com"}
             target="_blank"
             rel="noopener noreferrer"
             className="bg-white text-black font-headline font-bold px-8 py-3.5 uppercase tracking-widest text-sm hover:bg-primary transition-all inline-block"
           >
-            Get Directions
+            {data?.buttonText || "Get Directions"}
           </Link>
         </div>
       </div>
@@ -110,11 +109,11 @@ export default async function HomePage() {
   return (
     <>
       <Hero data={cmsData.hero} />
-      <PillarsSection data={cmsData.sections} />
-      <BeforeAfterSlider />
-      <ServiceCard />
+      <PillarsSection data={cmsData.pillars?.items} />
+      <BeforeAfterSlider data={cmsData.beforeAfter} />
+      <ServiceCard data={cmsData.services?.items} />
       <TestimonialCard reviewsData={reviewsRes} />
-      <MapSection />
+      <MapSection data={cmsData.map} />
     </>
   );
 }

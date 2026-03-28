@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useState, useRef, useCallback } from "react";
 
-export default function BeforeAfterSlider() {
+export default function BeforeAfterSlider({ data }) {
   const [sliderPos, setSliderPos] = useState(50);
   const containerRef = useRef(null);
   const isDragging = useRef(false);
@@ -36,10 +36,10 @@ export default function BeforeAfterSlider() {
     <section className="py-16 md:py-20 bg-surface-container-lowest overflow-hidden">
       <div className="max-w-[1200px] mx-auto px-4 lg:px-6 mb-12 md:mb-16">
         <h2 className="font-headline font-black text-[clamp(28px,4vw,48px)] uppercase tracking-tighter">
-          Paint <span className="text-primary">Restoration</span>
+          {data?.heading || "Paint"} <span className="text-primary">{data?.accentWord || "Restoration"}</span>
         </h2>
         <p className="text-on-surface-variant mt-4 font-body text-[clamp(14px,1.2vw,18px)]">
-          Swipe to witness the evolution from desert-worn to showroom-flawless.
+          {data?.subtitle || "Swipe to witness the evolution from desert-worn to showroom-flawless."}
         </p>
       </div>
       <div
@@ -58,11 +58,12 @@ export default function BeforeAfterSlider() {
           style={{ width: `${sliderPos}%` }}
         >
           <Image
-            src="/images/before-car.jpg"
+            src={data?.beforeImage || "/images/before-car.jpg"}
             alt="Scratched car surface before restoration"
             fill
             className="object-cover grayscale brightness-50"
             sizes="100vw"
+            unoptimized={!!data?.beforeImage}
           />
           <div className="absolute top-6 md:top-10 left-6 md:left-10 glass-panel px-4 md:px-6 py-2 font-headline font-black text-xs md:text-sm uppercase tracking-[0.2em]">
             Before
@@ -72,11 +73,12 @@ export default function BeforeAfterSlider() {
         {/* After */}
         <div className="absolute inset-0">
           <Image
-            src="/images/after-car.jpg"
+            src={data?.afterImage || "/images/after-car.jpg"}
             alt="Polished high gloss car surface after restoration"
             fill
             className="object-cover"
             sizes="100vw"
+            unoptimized={!!data?.afterImage}
           />
           <div className="absolute top-6 md:top-10 right-6 md:right-10 glass-panel px-4 md:px-6 py-2 font-headline font-black text-xs md:text-sm uppercase tracking-[0.2em] border-r-4 border-primary">
             After

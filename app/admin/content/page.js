@@ -222,7 +222,8 @@ export default function ContentManagementPage() {
     setLoading(true);
     try {
       const res = await api.get(`/admin/content/${pageKey}`);
-      const apiData = res.data?.data;
+      // Unnest the wrongly saved data if it exists, otherwise use raw response body
+      const apiData = res.data?.data?.hero || res.data?.data?.header || res.data?.data?.featuredArticle || res.data?.data?.categories ? res.data.data : res.data;
       if (apiData && Object.keys(apiData).length > 0) {
         tabConfig[pageKey]?.setData(apiData);
       }
@@ -241,7 +242,7 @@ export default function ContentManagementPage() {
     setSaving(true);
     try {
       const config = tabConfig[activeTab];
-      await api.put(`/admin/content/${config.pageKey}`, { data: config.data });
+      await api.put(`/admin/content/${config.pageKey}`, config.data);
       setLastSaved(new Date().toLocaleTimeString());
       toast.success("Content saved successfully");
     } catch (err) {

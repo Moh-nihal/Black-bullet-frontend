@@ -39,7 +39,9 @@ const serviceSummaries = [
   },
 ];
 
-export default function ServiceCard() {
+export default function ServiceCard({ data }) {
+  const items = data || serviceSummaries;
+  
   return (
     <section className="py-16 md:py-20 bg-surface">
       <div className="max-w-[1200px] mx-auto px-4 lg:px-6">
@@ -53,7 +55,7 @@ export default function ServiceCard() {
           <div className="hidden md:block pb-4 border-b border-outline w-1/3" />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px bg-outline-variant/20">
-          {serviceSummaries.map((service, index) => (
+          {items.map((service, index) => (
             <div
               key={service.slug}
               className="bg-surface p-8 border hover:bg-surface-container border-transparent hover:border-outline-variant/30 transition-all group relative overflow-hidden flex flex-col items-start"
