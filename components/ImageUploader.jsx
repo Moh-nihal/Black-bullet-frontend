@@ -54,7 +54,7 @@ export default function ImageUploader({ label, hint, aspectClass = "aspect-video
         ref={fileInputRef} 
         onChange={handleFileChange} 
         className="hidden" 
-        accept="image/*" 
+        accept="image/*,video/mp4,video/webm,video/quicktime" 
       />
       {hint && (
         <p className="text-[10px] text-on-surface-variant mt-2 font-label uppercase tracking-widest opacity-60">

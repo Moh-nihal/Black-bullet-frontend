@@ -1,17 +1,19 @@
 import Link from "next/link";
 
-export default function RelatedServices({ services }) {
+export default function RelatedServices({ services, locale = "en" }) {
+  const isAr = locale === "ar";
   return (
-    <section className="py-20 md:py-32 px-6 md:px-12 bg-surface">
+    <section className="py-20 md:py-32 px-6 md:px-12 bg-white">
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 md:mb-16 gap-6">
           <div>
-            <h2 className="font-headline font-black text-3xl md:text-4xl text-white uppercase tracking-tight">
-              Synergistic Upgrades
+            <h2 className="font-headline font-black text-3xl md:text-4xl text-black uppercase tracking-tight">
+              {isAr ? "ترقيات متكاملة" : "Synergistic Upgrades"}
             </h2>
             <p className="text-on-surface-variant mt-4">
-              Complete your vehicle&apos;s performance transformation with our
-              core services.
+              {isAr
+                ? "أكمل تحويل أداء مركبتك مع خدماتنا الأساسية."
+                : "Complete your vehicle's performance transformation with our core services."}
             </p>
           </div>
         </div>
@@ -23,11 +25,11 @@ export default function RelatedServices({ services }) {
               className="glass-card p-1 relative overflow-hidden group cursor-pointer block"
             >
               <div className="absolute inset-0 bg-primary opacity-0 group-hover:opacity-5 transition-opacity" />
-              <div className="p-8 md:p-12 border border-outline-variant/10">
+              <div className="p-8 md:p-12 border border-black/10">
                 <span className="material-symbols-outlined text-primary text-3xl md:text-4xl mb-6 block">
                   {svc.icon}
                 </span>
-                <h3 className="font-headline font-bold text-xl md:text-2xl text-white uppercase mb-4 tracking-wider">
+                <h3 className="font-headline font-bold text-xl md:text-2xl text-black uppercase mb-4 tracking-wider">
                   {svc.title}
                 </h3>
                 <p className="text-on-surface-variant mb-6 md:mb-8 max-w-md leading-relaxed">

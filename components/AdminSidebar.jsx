@@ -9,6 +9,8 @@ import toast from "react-hot-toast";
 const navItems = [
   { icon: "dashboard", label: "Dashboard", href: "/admin" },
   { icon: "calendar_today", label: "Bookings", href: "/admin/bookings" },
+  { icon: "rocket_launch", label: "Landing Pages", href: "/admin/landing" },
+  { icon: "group", label: "Leads", href: "/admin/leads" },
   { icon: "build", label: "Services", href: "/admin/services" },
   { icon: "collections", label: "Gallery", href: "/admin/gallery" },
   { icon: "article", label: "Blog", href: "/admin/blog" },
@@ -47,7 +49,7 @@ export default function AdminSidebar() {
       {/* Mobile Hamburger Button */}
       <button 
         onClick={() => setIsOpen(true)}
-        className="md:hidden fixed top-3 left-4 z-[60] p-1.5 bg-surface-container rounded-sm border border-white/10 flex items-center justify-center hover:bg-white/5 transition-colors"
+        className="md:hidden fixed top-3 left-4 z-[60] p-1.5 bg-black rounded-sm border border-black/10 flex items-center justify-center hover:bg-black/90 transition-colors shadow-lg"
       >
         <span className="material-symbols-outlined text-white text-xl">menu</span>
       </button>

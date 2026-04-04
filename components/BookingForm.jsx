@@ -1,30 +1,37 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
+import ReCAPTCHA from "react-google-recaptcha";
 import api from "@/lib/api";
 import toast from "react-hot-toast";
+import { pickLocalizedText } from "@/lib/pickLocalizedText";
 
-const vehicleTypes = [
-  { icon: "directions_car", label: "Supercar / Exotic" },
-  { icon: "sports_motorsports", label: "Hyper Performance" },
-  { icon: "precision_manufacturing", label: "Custom Build" },
+const getVehicleTypes = (locale) => [
+  { icon: "directions_car", label: locale === "ar" ? "سيارة رياضية / خارقة" : "Supercar / Exotic" },
+  { icon: "sports_motorsports", label: locale === "ar" ? "أداء فائق" : "Hyper Performance" },
+  { icon: "precision_manufacturing", label: locale === "ar" ? "بناء مخصص" : "Custom Build" },
 ];
 
-const serviceProtocols = [
-  {
-    icon: "bolt",
-    label: "ECU STAGE 2 REMAP",
-    desc: "Complete optimization for exhaust & intake hardware.",
-    elite: true,
-  },
-  {
-    icon: "format_paint",
-    label: "CARBON AERO FIT",
-    desc: "Precision installation of high-modulus carbon kits.",
-    elite: false,
-  },
-];
+const MAX_SERVICE_TYPE_LEN = 120;
+
+function mapPublicServicesToBookingOptions(list, locale) {
+  if (!Array.isArray(list)) return [];
+  return list.map((s) => {
+    const titleRaw = s.title;
+    const label = pickLocalizedText(titleRaw, locale);
+    const desc = pickLocalizedText(s.shortDesc || s.description, locale);
+    const forApi = label.trim().slice(0, MAX_SERVICE_TYPE_LEN);
+    return {
+      key: String(s.slug || s._id || label),
+      icon: s.icon || "build",
+      label,
+      desc,
+      serviceTypeForApi: forApi,
+    };
+  });
+}
 
 // Generate next 14 days for date selection
 const generateDates = () => {
@@ -47,9 +54,14 @@ const generateDates = () => {
 const FALLBACK_SLOTS = ["09:00 AM", "11:30 AM", "02:00 PM", "04:30 PM"];
 
 export default function BookingForm() {
+  const params = useParams();
+  const locale = params?.locale === "ar" ? "ar" : "en";
+
   const [activeStep, setActiveStep] = useState(0);
   const [selectedVehicle, setSelectedVehicle] = useState(0);
   const [selectedService, setSelectedService] = useState(0);
+  const [bookingServices, setBookingServices] = useState([]);
+  const [servicesLoading, setServicesLoading] = useState(true);
   const [selectedDateIndex, setSelectedDateIndex] = useState(0);
   const [selectedTime, setSelectedTime] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -65,23 +77,82 @@ export default function BookingForm() {
   const [availableSlots, setAvailableSlots] = useState(FALLBACK_SLOTS);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [dayIsClosed, setDayIsClosed] = useState(false);
+  const [recaptchaToken, setRecaptchaToken] = useState(null);
+  const recaptchaRef = useRef(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setServicesLoading(true);
+      try {
+        const res = await api.get("/public/services", {
+          params: { limit: 50, locale },
+        });
+        const list = res.data?.data;
+        const mapped = mapPublicServicesToBookingOptions(list, locale);
+        if (!cancelled) setBookingServices(mapped);
+      } catch (e) {
+        console.error("BookingForm: failed to load services", e);
+        if (!cancelled) {
+          setBookingServices([]);
+          toast.error("Could not load services. Please refresh the page.");
+        }
+      } finally {
+        if (!cancelled) setServicesLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [locale]);
+
+  useEffect(() => {
+    setSelectedService((i) => {
+      const n = bookingServices.length;
+      if (n === 0) return 0;
+      return Math.min(Math.max(0, i), n - 1);
+    });
+  }, [bookingServices.length]);
 
   const fetchSlots = useCallback(async (isoDate) => {
     setSlotsLoading(true);
     setSelectedTime(null);
     setDayIsClosed(false);
     try {
-      const res = await api.get(`/bookings/slots?date=${isoDate}`);
-      const data = res.data?.data;
-      if (data?.closed || !data?.slots?.length) {
+      const res = await api.get(`/public/bookings/available-slots?date=${isoDate}`);
+      
+      // The API should return { success: true, data: { closed: boolean, slots: string[] } }
+      // But we'll handle both the new object structure and the legacy array structure for robustness.
+      const rawData = res.data;
+      let slots = [];
+      let closed = false;
+
+      if (rawData && (rawData.success || rawData.ok) && rawData.data) {
+        // New structure (handles both .success and .ok)
+        slots = rawData.data.slots || [];
+        closed = rawData.data.closed || false;
+      } else if (Array.isArray(rawData)) {
+        // Legacy array structure
+        slots = rawData;
+        closed = slots.length === 0;
+      } else if (rawData && rawData.slots) {
+        // Alternative object structure
+        slots = rawData.slots || [];
+        closed = rawData.closed || false;
+      }
+
+      if (closed || !slots.length) {
         setDayIsClosed(true);
         setAvailableSlots([]);
       } else {
-        setAvailableSlots(data.slots);
+        setDayIsClosed(false);
+        setAvailableSlots(slots);
       }
-    } catch {
+    } catch (error) {
+      console.error("Error fetching slots:", error);
       // Use fallback slots if API fails
       setAvailableSlots(FALLBACK_SLOTS);
+      setDayIsClosed(false);
     } finally {
       setSlotsLoading(false);
     }
@@ -95,10 +166,10 @@ export default function BookingForm() {
   }, [selectedDateIndex, activeStep, fetchSlots]);
 
   const steps = [
-    { num: "01", stage: "Stage One", label: "Personal Identity" },
-    { num: "02", stage: "Stage Two", label: "Vehicle Profile" },
-    { num: "03", stage: "Stage Three", label: "Service Scope" },
-    { num: "04", stage: "Stage Four", label: "Tactical Timing" },
+    { num: "01", stage: locale === "ar" ? "المرحلة الأولى" : "Stage One", label: locale === "ar" ? "الهوية الشخصية" : "Personal Identity" },
+    { num: "02", stage: locale === "ar" ? "المرحلة الثانية" : "Stage Two", label: locale === "ar" ? "ملف المركبة" : "Vehicle Profile" },
+    { num: "03", stage: locale === "ar" ? "المرحلة الثالثة" : "Stage Three", label: locale === "ar" ? "نطاق الخدمة" : "Service Scope" },
+    { num: "04", stage: locale === "ar" ? "المرحلة الرابعة" : "Stage Four", label: locale === "ar" ? "التوقيت" : "Tactical Timing" },
   ];
 
   const handleSubmit = async (e) => {
@@ -123,6 +194,16 @@ export default function BookingForm() {
       toast.error("Please select a time slot");
       return;
     }
+    const selectedSvc = bookingServices[selectedService];
+    if (!selectedSvc?.serviceTypeForApi) {
+      toast.error("Please select a service");
+      setActiveStep(2);
+      return;
+    }
+    if (!recaptchaToken) {
+      toast.error("Please verify that you are not a robot");
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -132,17 +213,26 @@ export default function BookingForm() {
         email: formData.email.trim(),
         model: formData.model.trim(),
         vehicleTypeIndex: selectedVehicle,
-        serviceTypeIndex: selectedService,
+        serviceType: selectedSvc.serviceTypeForApi,
         preferredDate: selectedDate.isoDate,
         preferredTime: availableSlots[selectedTime],
         preferredDateLabel: `${selectedDate.dayLabel} ${selectedDate.dayNumber}`,
         notes: formData.notes.trim(),
+        recaptchaToken,
       });
       toast.success("Booking submitted! A Performance Engineer will contact you soon.");
       setSubmitted(true);
+      setRecaptchaToken(null);
+      if (recaptchaRef.current) recaptchaRef.current.reset();
     } catch (err) {
-      const message = err.response?.data?.message || err.message || "Failed to submit booking";
-      toast.error(message);
+      if (err.response?.status === 409) {
+        toast.error("This time slot was just taken. Please choose another.");
+        setSelectedTime(null);
+        fetchSlots(dates[selectedDateIndex].isoDate);
+      } else {
+        const message = err.response?.data?.message || err.message || "Failed to submit booking";
+        toast.error(message);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -150,22 +240,21 @@ export default function BookingForm() {
 
   if (submitted) {
     return (
-      <div className="bg-surface-container p-12 text-center space-y-6 max-w-2xl mx-auto">
+      <div className="bg-white border border-black/10 p-12 text-center space-y-6 max-w-2xl mx-auto shadow-lg">
         <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
           <span className="material-symbols-outlined text-primary text-4xl">task_alt</span>
         </div>
-        <h3 className="font-headline font-black text-2xl text-white uppercase italic">
-          Booking Confirmed
+        <h3 className="font-headline font-black text-2xl text-black uppercase italic">
+          {locale === "ar" ? "تم تأكيد الحجز" : "Booking Confirmed"}
         </h3>
         <p className="text-on-surface-variant text-sm max-w-md mx-auto">
-          Your booking has been submitted successfully. A Performance Engineer will contact you
-          within 60 minutes to finalize the details for your session.
+          {locale === "ar" ? "تم إرسال حجزك بنجاح. سيتواصل معك مهندس الأداء في غضون 60 دقيقة للانتهاء من التفاصيل." : "Your booking has been submitted successfully. A Performance Engineer will contact you within 60 minutes to finalize the details for your session."}
         </p>
         <Link
           href="/"
           className="inline-block bg-primary text-on-primary-fixed px-8 py-4 font-headline font-bold uppercase tracking-widest text-sm hover:brightness-110 transition-all mt-4"
         >
-          Return to Home
+          {locale === "ar" ? "العودة للرئيسية" : "Return to Home"}
         </Link>
       </div>
     );
@@ -214,11 +303,11 @@ export default function BookingForm() {
       <div className="lg:col-span-9">
         <form
           onSubmit={handleSubmit}
-          className="bg-surface-container p-6 md:p-8 lg:p-12 shadow-2xl relative overflow-hidden"
+          className="bg-white border border-black/10 p-6 md:p-8 lg:p-12 shadow-lg relative overflow-hidden"
         >
           {/* Progress Bar */}
           <div
-            className="absolute top-0 left-0 h-1 bg-primary shadow-[0_0_15px_#ff8f73] transition-all duration-500"
+            className="absolute top-0 left-0 h-1 bg-primary shadow-[0_0_15px_rgba(220,0,0,0.4)] transition-all duration-500"
             style={{ width: `${((activeStep + 1) / 4) * 100}%` }}
           />
 
@@ -229,11 +318,11 @@ export default function BookingForm() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 mb-8">
                   <div className="space-y-2">
                     <label className="font-label font-bold text-xs text-on-surface-variant uppercase tracking-widest">
-                      Pilot Name
+                      {locale === "ar" ? "اسم السائق" : "Pilot Name"}
                     </label>
                     <input
-                      className="w-full bg-surface-container-highest border-none text-white p-4 font-headline placeholder:text-outline-variant focus:ring-1 focus:ring-primary transition-all"
-                      placeholder="FULL NAME"
+                      className="w-full bg-surface-container border border-black/10 text-black p-4 font-headline placeholder:text-on-surface-variant/50 focus:ring-1 focus:ring-primary transition-all"
+                      placeholder={locale === "ar" ? "الاسم الكامل" : "FULL NAME"}
                       type="text"
                       value={formData.name}
                       onChange={(e) =>
@@ -244,11 +333,11 @@ export default function BookingForm() {
                   </div>
                   <div className="space-y-2">
                     <label className="font-label font-bold text-xs text-on-surface-variant uppercase tracking-widest">
-                      Contact Signal
+                      {locale === "ar" ? "وسيلة الاتصال" : "Contact Signal"}
                     </label>
                     <input
                       className="w-full bg-surface-container-highest border-none text-white p-4 font-headline placeholder:text-outline-variant focus:ring-1 focus:ring-primary transition-all"
-                      placeholder="EMAIL ADDRESS"
+                      placeholder={locale === "ar" ? "البريد الإلكتروني" : "EMAIL ADDRESS"}
                       type="email"
                       value={formData.email}
                       onChange={(e) =>
@@ -264,7 +353,7 @@ export default function BookingForm() {
                     onClick={() => setActiveStep(1)}
                     className="bg-primary text-on-primary-fixed px-10 py-4 font-headline font-bold uppercase tracking-widest text-sm hover:brightness-110 transition-all flex items-center gap-2"
                   >
-                    Next Stage
+                    {locale === "ar" ? "المرحلة التالية" : "Next Stage"}
                     <span className="material-symbols-outlined text-lg">arrow_forward</span>
                   </button>
                 </div>
@@ -275,11 +364,11 @@ export default function BookingForm() {
             {activeStep === 1 && (
               <div className="flex flex-col h-full justify-between">
                 <div className="mb-8">
-                  <h3 className="font-headline text-xl md:text-2xl font-black text-white mb-6 md:mb-8 uppercase italic tracking-tight">
-                    Machine Specifications
+                  <h3 className="font-headline text-xl md:text-2xl font-black text-black mb-6 md:mb-8 uppercase italic tracking-tight">
+                    {locale === "ar" ? "مواصفات الآلة" : "Machine Specifications"}
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {vehicleTypes.map((v, i) => (
+                    {getVehicleTypes(locale).map((v, i) => (
                       <button
                         key={v.label}
                         type="button"
@@ -302,7 +391,7 @@ export default function BookingForm() {
                         <p
                           className={`font-headline font-bold uppercase text-sm ${
                             selectedVehicle === i
-                              ? "text-white"
+                              ? "text-black"
                               : "text-on-surface-variant"
                           }`}
                         >
@@ -312,8 +401,8 @@ export default function BookingForm() {
                     ))}
                   </div>
                   <input
-                    className="mt-6 w-full bg-surface-container-highest border-none text-white p-4 font-headline placeholder:text-outline-variant focus:ring-1 focus:ring-primary transition-all"
-                    placeholder="MODEL YEAR & ENGINE SPEC (E.G. 2023 HURACAN STO)"
+                    className="mt-6 w-full bg-surface-container border border-black/10 text-black p-4 font-headline placeholder:text-on-surface-variant/50 focus:ring-1 focus:ring-primary transition-all"
+                    placeholder={locale === "ar" ? "سنة الموديل ومواصفات المحرك (مثل 2023 HURACAN STO)" : "MODEL YEAR & ENGINE SPEC (E.G. 2023 HURACAN STO)"}
                     type="text"
                     value={formData.model}
                     onChange={(e) =>
@@ -326,16 +415,16 @@ export default function BookingForm() {
                   <button
                     type="button"
                     onClick={() => setActiveStep(0)}
-                    className="text-on-surface-variant hover:text-white font-headline font-bold uppercase tracking-widest text-sm transition-colors"
+                    className="text-on-surface-variant hover:text-black font-headline font-bold uppercase tracking-widest text-sm transition-colors"
                   >
-                    Back
+                    {locale === "ar" ? "السابق" : "Back"}
                   </button>
                   <button
                     type="button"
                     onClick={() => setActiveStep(2)}
                     className="bg-primary text-on-primary-fixed px-10 py-4 font-headline font-bold uppercase tracking-widest text-sm hover:brightness-110 transition-all flex items-center gap-2"
                   >
-                    Next Stage
+                    {locale === "ar" ? "المرحلة التالية" : "Next Stage"}
                     <span className="material-symbols-outlined text-lg">arrow_forward</span>
                   </button>
                 </div>
@@ -346,49 +435,54 @@ export default function BookingForm() {
             {activeStep === 2 && (
               <div className="flex flex-col h-full justify-between">
                 <div className="mb-8">
-                  <h3 className="font-headline text-xl md:text-2xl font-black text-white mb-6 md:mb-8 uppercase italic tracking-tight">
-                    Select Protocol
+                  <h3 className="font-headline text-xl md:text-2xl font-black text-black mb-6 md:mb-8 uppercase italic tracking-tight">
+                    {locale === "ar" ? "اختر الخدمة" : "Select Service"}
                   </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {serviceProtocols.map((s, i) => (
-                      <button
-                        key={s.label}
-                        type="button"
-                        onClick={() => setSelectedService(i)}
-                        className={`p-5 md:p-6 text-left transition-colors cursor-pointer ${
-                          selectedService === i
-                            ? "bg-surface-container-highest border-2 border-primary"
-                            : "bg-surface-container-low border-2 border-transparent hover:bg-surface-container-highest"
-                        }`}
-                      >
-                        <div className="flex justify-between items-start mb-4">
-                          <span className={`material-symbols-outlined ${selectedService === i ? "text-primary" : "text-on-surface-variant"}`}>
-                            {s.icon}
-                          </span>
-                          {s.elite && (
-                            <span className="font-label text-[10px] bg-primary text-on-primary-fixed px-2 py-0.5 font-black uppercase">
-                              Elite
+                  {servicesLoading ? (
+                    <div className="flex justify-center py-12">
+                      <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  ) : bookingServices.length === 0 ? (
+                    <p className="text-on-surface-variant text-sm font-body py-4">
+                      {locale === "ar" ? "لا توجد خدمات متاحة للحجز حاليًا. يرجى المحاولة لاحقًا أو الاتصال بنا مباشرة." : "No services are available to book right now. Please try again later or contact us directly."}
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[min(420px,50vh)] overflow-y-auto pr-1">
+                      {bookingServices.map((s, i) => (
+                        <button
+                          key={s.key}
+                          type="button"
+                          onClick={() => setSelectedService(i)}
+                          className={`p-5 md:p-6 text-left transition-colors cursor-pointer ${
+                            selectedService === i
+                              ? "bg-surface-container-highest border-2 border-primary"
+                              : "bg-surface-container-low border-2 border-transparent hover:bg-surface-container-highest"
+                          }`}
+                        >
+                          <div className="flex justify-between items-start mb-4">
+                            <span
+                              className={`material-symbols-outlined ${selectedService === i ? "text-primary" : "text-on-surface-variant"}`}
+                            >
+                              {s.icon}
                             </span>
-                          )}
-                        </div>
-                        <h4 className="font-headline font-bold text-white uppercase text-sm">
-                          {s.label}
-                        </h4>
-                        <p className="text-on-surface-variant text-xs mt-2 font-body">
-                          {s.desc}
-                        </p>
-                      </button>
-                    ))}
-                  </div>
+                          </div>
+                          <h4 className="font-headline font-bold text-black uppercase text-sm">{s.label}</h4>
+                          {s.desc ? (
+                            <p className="text-on-surface-variant text-xs mt-2 font-body line-clamp-3">{s.desc}</p>
+                          ) : null}
+                        </button>
+                      ))}
+                    </div>
+                  )}
 
                   {/* Optional notes field */}
                   <div className="mt-6 space-y-2">
                     <label className="font-label font-bold text-xs text-on-surface-variant uppercase tracking-widest">
-                      Additional Notes (Optional)
+                      {locale === "ar" ? "ملاحظات إضافية (اختياري)" : "Additional Notes (Optional)"}
                     </label>
                     <textarea
-                      className="w-full bg-surface-container-highest border-none text-white p-4 font-headline placeholder:text-outline-variant focus:ring-1 focus:ring-primary transition-all resize-none"
-                      placeholder="ANY SPECIAL REQUIREMENTS..."
+                      className="w-full bg-surface-container border border-black/10 text-black p-4 font-headline placeholder:text-on-surface-variant/50 focus:ring-1 focus:ring-primary transition-all resize-none"
+                      placeholder={locale === "ar" ? "أي متطلبات خاصة..." : "ANY SPECIAL REQUIREMENTS..."}
                       rows={3}
                       value={formData.notes}
                       onChange={(e) =>
@@ -402,16 +496,27 @@ export default function BookingForm() {
                   <button
                     type="button"
                     onClick={() => setActiveStep(1)}
-                    className="text-on-surface-variant hover:text-white font-headline font-bold uppercase tracking-widest text-sm transition-colors"
+                    className="text-on-surface-variant hover:text-black font-headline font-bold uppercase tracking-widest text-sm transition-colors"
                   >
-                    Back
+                    {locale === "ar" ? "السابق" : "Back"}
                   </button>
                   <button
                     type="button"
-                    onClick={() => setActiveStep(3)}
-                    className="bg-primary text-on-primary-fixed px-10 py-4 font-headline font-bold uppercase tracking-widest text-sm hover:brightness-110 transition-all flex items-center gap-2"
+                    onClick={() => {
+                      if (!servicesLoading && bookingServices.length === 0) {
+                        toast.error("No services available to select.");
+                        return;
+                      }
+                      if (!bookingServices[selectedService]?.serviceTypeForApi) {
+                        toast.error("Please select a service.");
+                        return;
+                      }
+                      setActiveStep(3);
+                    }}
+                    disabled={servicesLoading || bookingServices.length === 0}
+                    className="bg-primary text-on-primary-fixed px-10 py-4 font-headline font-bold uppercase tracking-widest text-sm hover:brightness-110 transition-all flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
                   >
-                    Next Stage
+                    {locale === "ar" ? "المرحلة التالية" : "Next Stage"}
                     <span className="material-symbols-outlined text-lg">arrow_forward</span>
                   </button>
                 </div>
@@ -422,8 +527,8 @@ export default function BookingForm() {
             {activeStep === 3 && (
               <div className="flex flex-col h-full justify-between">
                 <div className="mb-8">
-                  <h3 className="font-headline text-xl md:text-2xl font-black text-white mb-6 md:mb-8 uppercase italic tracking-tight">
-                    Launch Window
+                  <h3 className="font-headline text-xl md:text-2xl font-black text-black mb-6 md:mb-8 uppercase italic tracking-tight">
+                    {locale === "ar" ? "نافذة الإطلاق (الموعد)" : "Launch Window"}
                   </h3>
 
                   {/* Dynamic date selector */}
@@ -435,8 +540,8 @@ export default function BookingForm() {
                         onClick={() => setSelectedDateIndex(i)}
                         className={`p-3 text-center transition-colors ${
                           selectedDateIndex === i
-                            ? "bg-surface-bright border-b-2 border-primary text-white"
-                            : "bg-surface-container-highest hover:bg-surface-bright cursor-pointer"
+                            ? "bg-white border-b-2 border-primary text-black"
+                            : "bg-surface-container hover:bg-white cursor-pointer"
                         }`}
                       >
                         <p className={`text-xs font-label ${selectedDateIndex === i ? "text-primary font-bold" : "opacity-50"}`}>
@@ -456,7 +561,7 @@ export default function BookingForm() {
                     <div className="bg-error-container/10 border border-error/30 p-6 text-center">
                       <span className="material-symbols-outlined text-error text-2xl mb-2 block">event_busy</span>
                       <p className="text-error text-sm font-label uppercase tracking-widest">
-                        This day is closed or fully booked. Please select another date.
+                        {locale === "ar" ? "هذا اليوم مغلق أو محجوز بالكامل. يرجى اختيار تاريخ آخر." : "This day is closed or fully booked. Please select another date."}
                       </p>
                     </div>
                   ) : (
@@ -468,13 +573,24 @@ export default function BookingForm() {
                           onClick={() => setSelectedTime(i)}
                           className={`py-3 px-4 font-headline text-xs font-bold transition-all ${
                             selectedTime === i
-                              ? "bg-primary text-on-primary-fixed shadow-[0_0_20px_rgba(255,143,115,0.3)]"
-                              : "bg-surface-container-highest text-white hover:bg-primary hover:text-on-primary-fixed cursor-pointer"
+                              ? "bg-primary text-white shadow-[0_0_20px_rgba(220,0,0,0.3)]"
+                              : "bg-surface-container text-black hover:bg-primary hover:text-white cursor-pointer"
                           }`}
                         >
                           {time}
                         </button>
                       ))}
+                    </div>
+                  )}
+
+                  {/* reCAPTCHA Widget */}
+                  {!dayIsClosed && availableSlots.length > 0 && !slotsLoading && (
+                    <div className="flex justify-center mt-8">
+                      <ReCAPTCHA
+                        ref={recaptchaRef}
+                        sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"}
+                        onChange={(token) => setRecaptchaToken(token)}
+                      />
                     </div>
                   )}
                 </div>
@@ -484,9 +600,9 @@ export default function BookingForm() {
                   <button
                     type="button"
                     onClick={() => setActiveStep(2)}
-                    className="text-on-surface-variant hover:text-white font-headline font-bold uppercase tracking-widest text-sm transition-colors"
+                    className="text-on-surface-variant hover:text-black font-headline font-bold uppercase tracking-widest text-sm transition-colors"
                   >
-                    Back
+                    {locale === "ar" ? "السابق" : "Back"}
                   </button>
                   <button
                     type="submit"
@@ -500,10 +616,10 @@ export default function BookingForm() {
                     {submitting ? (
                       <span className="flex items-center gap-3">
                         <span className="w-5 h-5 border-2 border-on-primary-fixed border-t-transparent rounded-full animate-spin" />
-                        SUBMITTING...
+                        {locale === "ar" ? "جاري الإرسال..." : "SUBMITTING..."}
                       </span>
                     ) : (
-                      "INITIATE BOOKING"
+                      locale === "ar" ? "بدء الحجز" : "INITIATE BOOKING"
                     )}
                   </button>
                 </div>
@@ -513,18 +629,17 @@ export default function BookingForm() {
         </form>
 
         {/* Confirmation Preview */}
-        <div className="mt-12 bg-surface-container-low p-8 border border-white/5 flex flex-col items-center text-center">
+        <div className="mt-12 bg-surface-container-low p-8 border border-black/10 flex flex-col items-center text-center">
           <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
             <span className="material-symbols-outlined text-primary text-3xl">
               task_alt
             </span>
           </div>
-          <h5 className="font-headline font-bold text-white text-xl uppercase italic">
-            Protocol Confirmed
+          <h5 className="font-headline font-bold text-black text-xl uppercase italic">
+            {locale === "ar" ? "تم تأكيد البروتوكول" : "Protocol Confirmed"}
           </h5>
           <p className="text-on-surface-variant text-sm mt-2 max-w-md">
-            Once you submit, a Performance Engineer will contact you within 60
-            minutes to finalize the telemetry data for your session.
+            {locale === "ar" ? "بمجرد التقديم، سيتواصل معك مهندس الأداء في غضون 60 دقيقة للانتهاء من بياناتك." : "Once you submit, a Performance Engineer will contact you within 60 minutes to finalize the telemetry data for your session."}
           </p>
         </div>
       </div>

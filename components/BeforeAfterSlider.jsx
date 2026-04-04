@@ -7,6 +7,10 @@ export default function BeforeAfterSlider({ data }) {
   const [sliderPos, setSliderPos] = useState(50);
   const containerRef = useRef(null);
   const isDragging = useRef(false);
+  const activePointerId = useRef(null);
+
+  const beforeSrc = data?.beforeImage;
+  const afterSrc = data?.afterImage;
 
   const handleMove = useCallback((clientX) => {
     if (!containerRef.current) return;
@@ -16,82 +20,105 @@ export default function BeforeAfterSlider({ data }) {
     setSliderPos(percent);
   }, []);
 
-  const handleMouseDown = () => {
+  const beginDrag = (e) => {
+    if (!containerRef.current) return;
     isDragging.current = true;
+    activePointerId.current = e.pointerId ?? null;
+    try {
+      if (e.pointerId != null) containerRef.current.setPointerCapture(e.pointerId);
+    } catch {
+      // Older browsers may throw; drag still works within the element.
+    }
+    if (typeof e.clientX === "number") handleMove(e.clientX);
   };
 
-  const handleMouseUp = () => {
+  const endDrag = (e) => {
+    if (!containerRef.current) return;
+    if (activePointerId.current != null && e.pointerId != null && e.pointerId !== activePointerId.current) return;
     isDragging.current = false;
+    activePointerId.current = null;
+    try {
+      if (e.pointerId != null) containerRef.current.releasePointerCapture(e.pointerId);
+    } catch {
+      // noop
+    }
   };
 
-  const handleMouseMove = (e) => {
-    if (isDragging.current) handleMove(e.clientX);
+  const onPointerMove = (e) => {
+    if (!isDragging.current) return;
+    if (activePointerId.current != null && e.pointerId != null && e.pointerId !== activePointerId.current) return;
+    handleMove(e.clientX);
   };
 
-  const handleTouchMove = (e) => {
-    handleMove(e.touches[0].clientX);
-  };
+  if (!beforeSrc || !afterSrc) {
+    return null;
+  }
 
   return (
-    <section className="py-16 md:py-20 bg-surface-container-lowest overflow-hidden">
-      <div className="max-w-[1200px] mx-auto px-4 lg:px-6 mb-12 md:mb-16">
-        <h2 className="font-headline font-black text-[clamp(28px,4vw,48px)] uppercase tracking-tighter">
-          {data?.heading || "Paint"} <span className="text-primary">{data?.accentWord || "Restoration"}</span>
-        </h2>
-        <p className="text-on-surface-variant mt-4 font-body text-[clamp(14px,1.2vw,18px)]">
-          {data?.subtitle || "Swipe to witness the evolution from desert-worn to showroom-flawless."}
-        </p>
-      </div>
+    <section className="py-16 md:py-20 bg-surface-container-low overflow-hidden">
+      {(data?.heading || data?.accentWord || data?.subtitle) && (
+        <div className="max-w-[1200px] mx-auto px-4 lg:px-6 mb-12 md:mb-16">
+          {(data?.heading || data?.accentWord) && (
+            <h2 className="font-headline font-black text-[clamp(28px,4vw,48px)] uppercase tracking-tighter text-black">
+              {data?.heading ? `${data.heading} ` : null}
+              {data?.accentWord ? <span className="text-primary">{data.accentWord}</span> : null}
+            </h2>
+          )}
+          {data?.subtitle && (
+            <p className="text-on-surface-variant mt-4 font-body text-[clamp(14px,1.2vw,18px)]">{data.subtitle}</p>
+          )}
+        </div>
+      )}
       <div
         ref={containerRef}
-        className="relative w-full h-[350px] md:h-[600px] cursor-col-resize select-none"
-        onMouseDown={handleMouseDown}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        onMouseMove={handleMouseMove}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleMouseUp}
+        className="relative w-full h-[350px] md:h-[600px] cursor-col-resize select-none touch-none"
+        onPointerDown={beginDrag}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        onPointerLeave={endDrag}
+        onPointerMove={onPointerMove}
       >
-        {/* Before */}
-        <div
-          className="absolute inset-0 overflow-hidden"
-          style={{ width: `${sliderPos}%` }}
-        >
+        <div className="absolute inset-0 z-0">
           <Image
-            src={data?.beforeImage || "/images/before-car.jpg"}
-            alt="Scratched car surface before restoration"
-            fill
-            className="object-cover grayscale brightness-50"
-            sizes="100vw"
-            unoptimized={!!data?.beforeImage}
-          />
-          <div className="absolute top-6 md:top-10 left-6 md:left-10 glass-panel px-4 md:px-6 py-2 font-headline font-black text-xs md:text-sm uppercase tracking-[0.2em]">
-            Before
-          </div>
-        </div>
-
-        {/* After */}
-        <div className="absolute inset-0">
-          <Image
-            src={data?.afterImage || "/images/after-car.jpg"}
-            alt="Polished high gloss car surface after restoration"
+            src={afterSrc}
+            alt={data?.afterLabel || ""}
             fill
             className="object-cover"
             sizes="100vw"
-            unoptimized={!!data?.afterImage}
+            unoptimized={typeof afterSrc === "string" && afterSrc.startsWith("http")}
           />
-          <div className="absolute top-6 md:top-10 right-6 md:right-10 glass-panel px-4 md:px-6 py-2 font-headline font-black text-xs md:text-sm uppercase tracking-[0.2em] border-r-4 border-primary">
-            After
-          </div>
+          {data?.afterLabel ? (
+            <div className="absolute top-6 md:top-10 right-6 md:right-10 bg-primary text-white px-4 md:px-6 py-2 font-headline font-black text-xs md:text-sm uppercase tracking-[0.2em]">
+              {data.afterLabel}
+            </div>
+          ) : null}
         </div>
 
-        {/* Slider Line */}
         <div
-          className="absolute top-0 bottom-0 w-1 bg-primary z-20 shadow-[0_0_20px_rgba(255,143,115,0.8)]"
+          className="absolute inset-0 z-10"
+          style={{ clipPath: `inset(0 ${100 - sliderPos}% 0 0)` }}
+        >
+          <Image
+            src={beforeSrc}
+            alt={data?.beforeLabel || ""}
+            fill
+            className="object-cover grayscale brightness-75"
+            sizes="100vw"
+            unoptimized={typeof beforeSrc === "string" && beforeSrc.startsWith("http")}
+          />
+          {data?.beforeLabel ? (
+            <div className="absolute top-6 md:top-10 left-6 md:left-10 bg-black text-white px-4 md:px-6 py-2 font-headline font-black text-xs md:text-sm uppercase tracking-[0.2em]">
+              {data.beforeLabel}
+            </div>
+          ) : null}
+        </div>
+
+        <div
+          className="absolute top-0 bottom-0 w-1 bg-primary z-20 shadow-[0_0_20px_rgba(220,0,0,0.6)]"
           style={{ left: `${sliderPos}%` }}
         >
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 md:w-12 md:h-12 bg-primary rounded-full flex items-center justify-center cursor-grab active:cursor-grabbing">
-            <span className="material-symbols-outlined text-on-primary-fixed text-lg md:text-2xl">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 md:w-12 md:h-12 bg-primary rounded-full flex items-center justify-center cursor-grab active:cursor-grabbing shadow-[0_4px_15px_rgba(220,0,0,0.4)]">
+            <span className="material-symbols-outlined text-white text-lg md:text-2xl">
               unfold_more_double
             </span>
           </div>

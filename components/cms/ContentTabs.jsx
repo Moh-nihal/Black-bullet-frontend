@@ -20,7 +20,7 @@ export default function ContentTabs({ activeTab, onTabChange }) {
             className={`flex items-center gap-2 px-5 py-3 text-xs font-headline font-bold uppercase tracking-widest whitespace-nowrap transition-all ${
               active
                 ? "bg-primary/10 text-primary border-b-2 border-primary"
-                : "text-on-surface-variant hover:bg-white/5 hover:text-white border-b-2 border-transparent"
+                : "text-on-surface-variant hover:bg-white/5 hover:text-black border-b-2 border-transparent"
             }`}
           >
             <span

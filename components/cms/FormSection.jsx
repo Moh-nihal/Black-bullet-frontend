@@ -18,7 +18,7 @@ export default function FormSection({ title, icon, children, defaultOpen = true 
               {icon}
             </span>
           </div>
-          <h3 className="font-headline text-sm font-bold uppercase tracking-widest text-white">
+          <h3 className="font-headline text-sm font-bold uppercase tracking-widest text-black">
             {title}
           </h3>
         </div>

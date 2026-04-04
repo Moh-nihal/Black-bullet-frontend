@@ -78,7 +78,7 @@ export default function TestimonialsManager({ data, onChange }) {
                         {testimonial.initials || testimonial.name?.split(" ").map(n => n[0]).join("") || "?"}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-bold text-white">{testimonial.name || "Untitled"}</p>
+                        <p className="text-sm font-bold text-black">{testimonial.name || "Untitled"}</p>
                         <div className="flex items-center gap-1 mt-0.5">
                           {Array.from({ length: 5 }, (_, i) => (
                             <span
@@ -102,7 +102,7 @@ export default function TestimonialsManager({ data, onChange }) {
                       <button
                         onClick={() => setEditingId(isEditing ? null : testimonial.id)}
                         className={`w-8 h-8 flex items-center justify-center transition-colors ${
-                          isEditing ? "bg-primary/20 text-primary" : "text-on-surface-variant hover:text-white opacity-0 group-hover:opacity-100"
+                          isEditing ? "bg-primary/20 text-primary" : "text-on-surface-variant hover:text-black opacity-0 group-hover:opacity-100"
                         }`}
                       >
                         <span className="material-symbols-outlined text-sm">{isEditing ? "check" : "edit"}</span>
@@ -128,7 +128,7 @@ export default function TestimonialsManager({ data, onChange }) {
                             type="text"
                             value={testimonial.name}
                             onChange={(e) => updateTestimonial(testimonial.id, "name", e.target.value)}
-                            className="w-full bg-surface-container-highest border-none text-white px-4 py-3 text-sm font-body focus:ring-0 focus:border-b-2 focus:border-primary transition-all placeholder:text-outline"
+                            className="w-full bg-surface-container-highest border-none text-black px-4 py-3 text-sm font-body focus:ring-0 focus:border-b-2 focus:border-primary transition-all placeholder:text-on-surface-variant/70"
                           />
                         </div>
                         <div>
@@ -140,23 +140,38 @@ export default function TestimonialsManager({ data, onChange }) {
                             value={testimonial.initials}
                             onChange={(e) => updateTestimonial(testimonial.id, "initials", e.target.value)}
                             maxLength={2}
-                            className="w-full bg-surface-container-highest border-none text-white px-4 py-3 text-sm font-body focus:ring-0 focus:border-b-2 focus:border-primary transition-all uppercase placeholder:text-outline"
+                            className="w-full bg-surface-container-highest border-none text-black px-4 py-3 text-sm font-body focus:ring-0 focus:border-b-2 focus:border-primary transition-all uppercase placeholder:text-on-surface-variant/70"
                             placeholder="e.g. KA"
                           />
                         </div>
                       </div>
 
-                      <div>
-                        <label className="block font-headline text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant mb-2">
-                          Review Text
-                        </label>
-                        <textarea
-                          value={testimonial.quote}
-                          onChange={(e) => updateTestimonial(testimonial.id, "quote", e.target.value)}
-                          rows={4}
-                          className="w-full bg-surface-container-highest border-none text-white px-4 py-3 text-sm font-body focus:ring-0 focus:border-b-2 focus:border-primary transition-all resize-none italic placeholder:text-outline"
-                          placeholder="Client review text..."
-                        />
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div>
+                          <label className="block font-headline text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant mb-2">
+                            Review Text (EN)
+                          </label>
+                          <textarea
+                            value={testimonial.quote}
+                            onChange={(e) => updateTestimonial(testimonial.id, "quote", e.target.value)}
+                            rows={4}
+                            className="w-full bg-surface-container-highest border-none text-black px-4 py-3 text-sm font-body focus:ring-0 focus:border-b-2 focus:border-primary transition-all resize-none italic placeholder:text-on-surface-variant/70"
+                            placeholder="Client review text..."
+                          />
+                        </div>
+                        <div>
+                          <label className="block font-headline text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant mb-2">
+                            Review Text (AR)
+                          </label>
+                          <textarea
+                            dir="rtl"
+                            value={testimonial.quoteAr || ""}
+                            onChange={(e) => updateTestimonial(testimonial.id, "quoteAr", e.target.value)}
+                            rows={4}
+                            className="w-full bg-surface-container-highest border-none text-black px-4 py-3 text-sm font-body focus:ring-0 focus:border-b-2 focus:border-primary transition-all resize-none italic placeholder:text-on-surface-variant/70"
+                            placeholder="نص المراجعة..."
+                          />
+                        </div>
                       </div>
 
                       <div className="flex items-center justify-between">

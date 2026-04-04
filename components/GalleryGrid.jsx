@@ -1,14 +1,32 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import useSWR from "swr";
+import GalleryVideoTile from "@/components/GalleryVideoTile";
+import { pickLocalizedText } from "@/lib/pickLocalizedText";
+import {
+  normalizeGalleryCategories,
+  galleryCategoryFilterKey,
+  galleryCategoryLabel,
+} from "@/lib/normalizeGalleryCategories";
+
+/** English (or only) category value for API query + chip filter match */
+function categoryFilterKey(cat) {
+  if (cat == null) return "";
+  if (typeof cat === "object" && !Array.isArray(cat)) {
+    const en = typeof cat.en === "string" ? cat.en.trim() : "";
+    if (en) return en;
+    return typeof cat.ar === "string" ? cat.ar.trim() : "";
+  }
+  return String(cat).trim();
+}
 
 const API_URL = typeof window === 'undefined' ? (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001") : "";
 
 const fetcher = (url) => fetch(url, { cache: "no-store" }).then((res) => res.json());
 
-const categories = ["All Projects", "Detailing", "Wrapping", "Performance"];
+const defaultCategories = ["All Projects", "Detailing", "Wrapping", "Performance"];
 
 // Fallback gallery items
 const fallbackGalleryItems = [
@@ -32,37 +50,73 @@ const masonryClasses = [
   "masonry-item-wide",
 ];
 
-export default function GalleryGrid() {
+export default function GalleryGrid({ categories: categoriesProp, items: itemsProp, locale = "en" }) {
   const [activeCategory, setActiveCategory] = useState(0);
 
-  // Build API URL with category filter
-  const selectedCat = categories[activeCategory];
-  const apiUrl = selectedCat === "All Projects"
+  const categories = useMemo(() => {
+    if (Array.isArray(categoriesProp) && categoriesProp.length > 0) {
+      return normalizeGalleryCategories(categoriesProp);
+    }
+    return normalizeGalleryCategories(defaultCategories);
+  }, [categoriesProp]);
+
+  const selectedRow = categories[activeCategory] || categories[0];
+  const selectedFilterKey = galleryCategoryFilterKey(selectedRow);
+  const isAllProjectsFilter = activeCategory === 0;
+
+  const apiUrl = isAllProjectsFilter
     ? `${API_URL}/api/public/gallery?limit=50`
-    : `${API_URL}/api/public/gallery?limit=50&category=${encodeURIComponent(selectedCat)}`;
+    : `${API_URL}/api/public/gallery?limit=50&category=${encodeURIComponent(selectedFilterKey)}`;
 
   const { data, isLoading } = useSWR(apiUrl, fetcher);
   const apiItems = data?.data || [];
 
-  // Map API items to display format, or use fallback
-  const galleryItems = apiItems.length > 0
-    ? apiItems.map((item, i) => ({
-        src: item.thumbnail || item.url || "/images/gallery-porsche.jpg",
-        alt: item.altText || item.title || "Gallery image",
-        title: item.title || "",
-        subtitle: item.category || "",
-        className: masonryClasses[i % masonryClasses.length],
-        isRemote: !!(item.thumbnail || item.url),
-      }))
-    : fallbackGalleryItems;
+  const cmsItems = itemsProp;
+  const hasCmsItemsProp = Array.isArray(cmsItems);
+
+  // Map API items to display format, or use CMS items (even if empty), or built-in fallback
+  const galleryItemsRaw = apiItems.length > 0
+    ? apiItems.map((item, i) => {
+        const catKey = categoryFilterKey(item.category);
+        return {
+          type: item.type || "image",
+          src: item.thumbnail || item.url || "/images/gallery-porsche.jpg",
+          alt: pickLocalizedText(item.altText, locale) || pickLocalizedText(item.title, locale) || "Gallery image",
+          title: pickLocalizedText(item.title, locale),
+          subtitle: pickLocalizedText(item.category, locale),
+          categoryFilter: catKey,
+          className: masonryClasses[i % masonryClasses.length],
+          isRemote: !!(item.thumbnail || item.url),
+        };
+      })
+    : hasCmsItemsProp
+      ? (cmsItems || []).map((item, i) => ({
+          type: item.type || "image",
+          src: item.src,
+          alt: item.alt || item.title || "Gallery image",
+          title: item.title || "",
+          subtitle: item.subtitle || "",
+          categoryFilter: item.category || "",
+          className: item.className || masonryClasses[i % masonryClasses.length],
+          isRemote: !!(typeof item.src === "string" && (item.src.startsWith("http://") || item.src.startsWith("https://"))),
+        }))
+      : fallbackGalleryItems;
+
+  const galleryItems =
+    isAllProjectsFilter
+      ? galleryItemsRaw
+      : galleryItemsRaw.filter((it) => {
+          const key = it.categoryFilter ?? "";
+          return key === selectedFilterKey;
+        });
 
   return (
     <>
       {/* Filter Buttons */}
       <div className="flex flex-wrap gap-3 md:gap-4 mb-10 md:mb-12">
-        {categories.map((cat, i) => (
+        {categories.map((row, i) => (
           <button
-            key={cat}
+            key={`${galleryCategoryFilterKey(row)}-${i}`}
             onClick={() => setActiveCategory(i)}
             className={`px-6 md:px-8 py-3 font-label font-bold uppercase tracking-widest text-xs transition-colors ${
               activeCategory === i
@@ -70,7 +124,7 @@ export default function GalleryGrid() {
                 : "bg-surface-container text-on-surface-variant hover:text-white border border-outline-variant/20"
             }`}
           >
-            {cat}
+            {galleryCategoryLabel(row, locale)}
           </button>
         ))}
       </div>
@@ -85,45 +139,55 @@ export default function GalleryGrid() {
       {/* Masonry Grid */}
       {!isLoading && (
         <section className="masonry-grid">
-          {galleryItems.map((item, index) => (
-            <div
-              key={index}
-              className={`${item.className} relative overflow-hidden bg-surface-container group`}
-            >
-              <Image
-                src={item.src}
-                alt={item.alt}
-                fill
-                className={`object-cover transition-transform duration-700 group-hover:scale-110 ${
-                  item.grayscale
-                    ? "grayscale group-hover:grayscale-0 transition-all"
-                    : ""
-                }`}
-                sizes="(max-width: 768px) 100vw, 33vw"
-                unoptimized={!!item.isRemote}
-              />
+          {galleryItems.length === 0 ? (
+            <div className="col-span-full bg-surface-container border border-outline-variant/20 p-10 md:p-14 text-center text-on-surface-variant font-label uppercase tracking-widest">
+              No gallery items yet.
+            </div>
+          ) : galleryItems.map((item, index) => (
+            <div key={index} className={`${item.className} relative overflow-hidden bg-surface-container group`}>
+              {item.type === "video" || (typeof item.src === "string" && item.src.match(/\.(mp4|webm|mov)(\?|#|$)/i)) ? (
+                <GalleryVideoTile src={item.src} title={item.title} subtitle={item.subtitle} />
+              ) : (
+                <Image
+                  src={item.src}
+                  alt={item.alt}
+                  fill
+                  className={`object-cover transition-transform duration-700 group-hover:scale-110 ${
+                    item.grayscale
+                      ? "grayscale group-hover:grayscale-0 transition-all"
+                      : ""
+                  }`}
+                  sizes="(max-width: 768px) 100vw, 33vw"
+                  unoptimized={!!item.isRemote}
+                />
+              )}
 
-              {/* Hover Overlay for titled items */}
-              {item.title && !item.hasStats && (
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-6 md:p-8 flex flex-col justify-end">
+              {/* Hover Overlay for titled items (images only; videos render their own overlay) */}
+              {!(item.type === "video" || (typeof item.src === "string" && item.src.match(/\.(mp4|webm|mov)(\?|#|$)/i))) &&
+                item.title &&
+                !item.hasStats &&
+                item.className !== "masonry-item-wide" && (
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-6 md:p-8 flex flex-col justify-end">
                   {item.subtitle && (
-                    <p className="font-label text-primary text-xs font-bold uppercase tracking-widest">
+                    <p className="font-label text-primary text-xs font-bold uppercase tracking-widest drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]">
                       {item.subtitle}
                     </p>
                   )}
-                  <h4 className="font-headline text-lg md:text-xl font-bold italic uppercase tracking-tighter">
+                  <h4 className="font-headline text-lg md:text-xl font-bold italic uppercase tracking-tighter text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.7)]">
                     {item.title}
                   </h4>
                 </div>
               )}
 
               {/* Always-visible title for wide items */}
-              {item.title && item.className === "masonry-item-wide" && (
+              {!(item.type === "video" || (typeof item.src === "string" && item.src.match(/\.(mp4|webm|mov)(\?|#|$)/i))) &&
+                item.title &&
+                item.className === "masonry-item-wide" && (
                 <div className="absolute bottom-4 md:bottom-6 left-4 md:left-6">
-                  <h4 className="font-headline text-xl md:text-2xl font-black italic uppercase tracking-tighter">
+                  <h4 className="font-headline text-xl md:text-2xl font-black italic uppercase tracking-tighter text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.65)]">
                     {item.title}
                   </h4>
-                  <p className="text-xs uppercase tracking-widest font-bold text-on-surface-variant">
+                  <p className="text-xs uppercase tracking-widest font-bold text-white/75 drop-shadow-[0_1px_2px_rgba(0,0,0,0.65)]">
                     {item.subtitle}
                   </p>
                 </div>

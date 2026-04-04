@@ -1,54 +1,73 @@
 @import "tailwindcss";
 
 @theme inline {
-  --color-background: #0e0e0e;
-  --color-foreground: #ffffff;
-  --color-primary: #ff8f73;
-  --color-primary-dim: #dc3300;
-  --color-primary-fixed: #ff7856;
-  --color-primary-fixed-dim: #ff5c34;
-  --color-primary-container: #ff7856;
-  --color-on-primary: #5e1000;
-  --color-on-primary-fixed: #000000;
-  --color-on-primary-container: #490b00;
-  --color-on-primary-fixed-variant: #5a0f00;
-  --color-surface: #0e0e0e;
-  --color-surface-dim: #0e0e0e;
-  --color-surface-bright: #2c2c2c;
-  --color-surface-container: #1a1919;
-  --color-surface-container-low: #131313;
-  --color-surface-container-high: #201f1f;
-  --color-surface-container-highest: #262626;
-  --color-surface-container-lowest: #000000;
-  --color-surface-variant: #262626;
-  --color-surface-tint: #ff8f73;
-  --color-on-surface: #ffffff;
-  --color-on-surface-variant: #adaaaa;
-  --color-on-background: #ffffff;
-  --color-secondary: #e5e2e1;
-  --color-secondary-dim: #d6d4d3;
-  --color-secondary-container: #474746;
-  --color-secondary-fixed: #e5e2e1;
-  --color-on-secondary: #525151;
-  --color-on-secondary-container: #d2d0cf;
-  --color-tertiary: #e9aaff;
-  --color-tertiary-dim: #d28aee;
-  --color-tertiary-container: #e197fc;
-  --color-outline: #767575;
-  --color-outline-variant: #484847;
-  --color-inverse-surface: #fcf9f8;
-  --color-inverse-primary: #b52900;
-  --color-inverse-on-surface: #565555;
-  --color-error: #ff6e84;
-  --color-error-dim: #d73357;
-  --color-error-container: #a70138;
-  --color-on-error: #490013;
-  --color-on-error-container: #ffb2b9;
+  /* ──────── Light Theme: Brand Colors ──────── */
+  --color-background: #FFFFFF;
+  --color-foreground: #111111;
 
+  /* Brand Red */
+  --color-primary: #DC0000;
+  --color-primary-dim: #B00000;
+  --color-primary-fixed: #DC0000;
+  --color-primary-fixed-dim: #A00000;
+  --color-primary-container: #FFDAD5;
+  --color-on-primary: #FFFFFF;
+  --color-on-primary-fixed: #FFFFFF;
+  --color-on-primary-container: #410001;
+  --color-on-primary-fixed-variant: #FFFFFF;
+
+  /* Surfaces — Light */
+  --color-surface: #FFFFFF;
+  --color-surface-dim: #F5F5F5;
+  --color-surface-bright: #FFFFFF;
+  --color-surface-container: #F5F5F5;
+  --color-surface-container-low: #FAFAFA;
+  --color-surface-container-high: #EEEEEE;
+  --color-surface-container-highest: #E0E0E0;
+  --color-surface-container-lowest: #FFFFFF;
+  --color-surface-variant: #F0F0F0;
+  --color-surface-tint: #DC0000;
+
+  /* On-Surface — Dark text on light bg */
+  --color-on-surface: #111111;
+  --color-on-surface-variant: #555555;
+  --color-on-background: #111111;
+
+  /* Secondary */
+  --color-secondary: #333333;
+  --color-secondary-dim: #555555;
+  --color-secondary-container: #F0F0F0;
+  --color-secondary-fixed: #333333;
+  --color-on-secondary: #FFFFFF;
+  --color-on-secondary-container: #333333;
+
+  /* Tertiary */
+  --color-tertiary: #DC0000;
+  --color-tertiary-dim: #B00000;
+  --color-tertiary-container: #FFDAD5;
+
+  /* Outline */
+  --color-outline: #CCCCCC;
+  --color-outline-variant: #E0E0E0;
+
+  /* Inverse */
+  --color-inverse-surface: #111111;
+  --color-inverse-primary: #FF6659;
+  --color-inverse-on-surface: #FFFFFF;
+
+  /* Error */
+  --color-error: #DC0000;
+  --color-error-dim: #A00000;
+  --color-error-container: #FFDAD5;
+  --color-on-error: #FFFFFF;
+  --color-on-error-container: #410001;
+
+  /* Fonts */
   --font-headline: "Space Grotesk", sans-serif;
   --font-body: "Manrope", sans-serif;
   --font-label: "Space Grotesk", sans-serif;
 
+  /* Sharp corners = premium automotive */
   --radius-sm: 0px;
   --radius: 0px;
   --radius-md: 0px;
@@ -71,32 +90,28 @@
   font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
 }
 
-/* Custom utilities */
+/* ──────── Custom Utilities (Light Theme) ──────── */
+
+/* Brand gradient — now red */
 .kinetic-gradient {
-  background: linear-gradient(135deg, #ff8f73 0%, #dc3300 100%);
+  background: linear-gradient(135deg, #DC0000 0%, #B00000 100%);
 }
 
+/* Glass panel — light frosted glass */
 .glass-panel {
-  background: rgba(38, 38, 38, 0.6);
+  background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(20px);
+  border: 1px solid rgba(0, 0, 0, 0.08);
 }
 
 .glass-overlay {
-  background: rgba(38, 38, 38, 0.6);
+  background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(20px);
 }
 
+/* Text glow — red glow for accents */
 .text-glow {
-  text-shadow: 0 0 20px rgba(255, 143, 115, 0.4);
-}
-
-.carbon-pattern {
-  background-color: #0e0e0e;
-  background-image: linear-gradient(45deg, #131313 25%, transparent 25%),
-    linear-gradient(-45deg, #131313 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #131313 75%),
-    linear-gradient(-45deg, transparent 75%, #131313 75%);
-  background-size: 4px 4px;
+  text-shadow: 0 0 20px rgba(220, 0, 0, 0.3);
 }
 
 /* Masonry Grid */
@@ -114,11 +129,11 @@
   .masonry-item-wide { grid-column: span 1; }
 }
 
-/* Scrollbar */
+/* Scrollbar — light theme */
 ::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #0e0e0e; }
-::-webkit-scrollbar-thumb { background: #262626; }
-::-webkit-scrollbar-thumb:hover { background: #ff8f73; }
+::-webkit-scrollbar-track { background: #F5F5F5; }
+::-webkit-scrollbar-thumb { background: #CCCCCC; }
+::-webkit-scrollbar-thumb:hover { background: #DC0000; }
 
 /* Infinite scroll animation */
 @keyframes infinite-scroll {
@@ -129,14 +144,14 @@
   animation: infinite-scroll 40s linear infinite;
 }
 
-/* Selection */
+/* Selection — red brand */
 ::selection {
-  background: #ff8f73;
-  color: #000000;
+  background: #DC0000;
+  color: #FFFFFF;
 }
 
 body {
-  background: #0e0e0e;
-  color: #ffffff;
+  background: #FFFFFF;
+  color: #111111;
   font-family: "Manrope", sans-serif;
 }

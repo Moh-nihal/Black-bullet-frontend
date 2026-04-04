@@ -5,7 +5,7 @@ export default function ToggleSwitch({ label, description, checked, onChange }) 
     <div className="flex items-center justify-between gap-4">
       <div>
         {label && (
-          <p className="font-label text-sm font-bold text-white">{label}</p>
+          <p className="font-label text-sm font-bold text-black">{label}</p>
         )}
         {description && (
           <p className="text-xs text-on-surface-variant mt-0.5">{description}</p>
